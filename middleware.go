@@ -42,11 +42,22 @@ func signatureMiddleware(privateKeyPEM string) resty.RequestMiddleware {
 		}
 
 		paramsMap := make(map[string]interface{})
-		paramsMap["merchantNo"] = haozReq.MerchantNo
-		paramsMap["timestamp"] = fmt.Sprintf("%d", haozReq.Timestamp)
+
+		// 展开 bizBody JSON 到 paramsMap
 		if haozReq.BizBody != "" {
-			paramsMap["bizBody"] = haozReq.BizBody
+			var bizBodyMap map[string]interface{}
+			if err := json.Unmarshal([]byte(haozReq.BizBody), &bizBodyMap); err != nil {
+				return fmt.Errorf("failed to unmarshal bizBody: %w", err)
+			}
+			// 将 bizBody 中的所有字段添加到 paramsMap
+			for k, v := range bizBodyMap {
+				paramsMap[k] = v
+			}
 		}
+
+		// 添加 merchantNo 和 timestamp（使用数字类型，不是字符串）
+		paramsMap["merchantNo"] = haozReq.MerchantNo
+		paramsMap["timestamp"] = haozReq.Timestamp
 
 		sign, err := GenerateSign(paramsMap, privateKeyPEM)
 		if err != nil {
