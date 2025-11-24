@@ -49,8 +49,7 @@ func main() {
     config := haozpay.DefaultConfig().
         WithBaseURL("https://gate.haozpay.com").
         WithMerchantNo("HZ1971294971928846336").
-        WithPrivateKey(privateKeyPEM).  // 商户RSA私钥
-        WithPublicKey(platformPublicKey) // 平台RSA公钥
+        WithPrivateKey(privateKeyPEM)  // 商户RSA私钥
     
     // 创建客户端
     client, err := haozpay.NewClient(config)
@@ -176,7 +175,6 @@ openssl pkcs8 -topk8 -in rsa_private_key.pem -out pkcs8_private_key.pem -nocrypt
 
 1. **商户私钥**: 将生成的私钥通过 `WithPrivateKey()` 配置，用于请求签名
 2. **商户公钥**: 将生成的公钥上传到皓臻支付平台控台
-3. **平台公钥**: 从皓臻支付平台控台获取，通过 `WithPublicKey()` 配置，用于回调验签
 
 ## ⚙️ 高级配置
 

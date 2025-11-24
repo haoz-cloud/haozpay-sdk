@@ -10,18 +10,11 @@ import (
 type Config struct {
 	// BaseURL API 服务的基础地址，例如: https://gate.haozpay.com
 	BaseURL string
-	// APIKey API 密钥，用于身份认证（保留字段，皓臻支付暂未使用）
-	APIKey string
-	// Secret 签名密钥（保留字段，皓臻支付使用RSA签名）
-	Secret string
 	// MerchantNo 商户编号，由皓臻支付平台分配
 	MerchantNo string
 	// PrivateKey 商户RSA私钥(PEM格式)，用于请求签名
 	// 需要妥善保管，不可泄露
 	PrivateKey string
-	// PublicKey 平台RSA公钥(PEM格式)，用于回调验签
-	// 从皓臻支付平台控台获取
-	PublicKey string
 	// Timeout 单个请求的超时时间，默认 30 秒
 	Timeout time.Duration
 	// RetryCount 请求失败时的重试次数，默认 3 次
@@ -79,34 +72,6 @@ func (c *Config) WithBaseURL(baseURL string) *Config {
 	return c
 }
 
-// WithAPIKey 设置 API 密钥
-// 支持链式调用
-// 注意: 皓臻支付暂不使用此字段，保留用于兼容
-//
-// 参数:
-//   - apiKey: API 密钥字符串
-//
-// 返回:
-//   - *Config: 返回自身以支持链式调用
-func (c *Config) WithAPIKey(apiKey string) *Config {
-	c.APIKey = apiKey
-	return c
-}
-
-// WithSecret 设置签名密钥
-// 支持链式调用
-// 注意: 皓臻支付使用RSA签名，请使用WithPrivateKey和WithPublicKey
-//
-// 参数:
-//   - secret: 签名密钥字符串
-//
-// 返回:
-//   - *Config: 返回自身以支持链式调用
-func (c *Config) WithSecret(secret string) *Config {
-	c.Secret = secret
-	return c
-}
-
 // WithMerchantNo 设置商户编号
 // 支持链式调用
 //
@@ -146,30 +111,6 @@ func (c *Config) WithMerchantNo(merchantNo string) *Config {
 //	config.WithPrivateKey(privateKeyPEM)
 func (c *Config) WithPrivateKey(privateKey string) *Config {
 	c.PrivateKey = privateKey
-	return c
-}
-
-// WithPublicKey 设置平台RSA公钥
-// 支持链式调用
-//
-// 参数:
-//   - publicKey: 平台RSA公钥(PEM格式)，用于回调验签
-//
-// 返回:
-//   - *Config: 返回自身以支持链式调用
-//
-// 注意:
-//   - 公钥从皓臻支付平台控台获取
-//   - 用于验证异步回调通知的签名
-//
-// 示例:
-//
-//	publicKeyPEM := `-----BEGIN PUBLIC KEY-----
-//	MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A...
-//	-----END PUBLIC KEY-----`
-//	config.WithPublicKey(publicKeyPEM)
-func (c *Config) WithPublicKey(publicKey string) *Config {
-	c.PublicKey = publicKey
 	return c
 }
 
