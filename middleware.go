@@ -1,7 +1,6 @@
 package haozpay
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -42,14 +41,14 @@ func signatureMiddleware(privateKeyPEM string) resty.RequestMiddleware {
 			return nil
 		}
 
-		paramsMap := make(map[string]string)
+		paramsMap := make(map[string]interface{})
 		paramsMap["merchantNo"] = haozReq.MerchantNo
 		paramsMap["timestamp"] = fmt.Sprintf("%d", haozReq.Timestamp)
 		if haozReq.BizBody != "" {
 			paramsMap["bizBody"] = haozReq.BizBody
 		}
 
-		sign, err := generateHaozPaySignature(privateKeyPEM, paramsMap)
+		sign, err := GenerateSign(paramsMap, privateKeyPEM)
 		if err != nil {
 			return fmt.Errorf("failed to generate signature: %w", err)
 		}
@@ -113,45 +112,6 @@ func generateHaozPaySignature(privateKeyPEM string, params map[string]string) (s
 	return base64.StdEncoding.EncodeToString(encrypted), nil
 }
 
-// parsePrivateKey 解析PEM格式的私钥
-// 支持两种格式:
-//  1. 完整的 PEM 格式(带 -----BEGIN/END----- 标志)
-//  2. 纯 Base64 编码的密钥字符串(不带标志)
-func parsePrivateKey(privateKeyPEM string) (*rsa.PrivateKey, error) {
-	var keyBytes []byte
-
-	// 尝试 PEM 解码
-	block, _ := pem.Decode([]byte(privateKeyPEM))
-	if block != nil {
-		// PEM 格式
-		keyBytes = block.Bytes
-	} else {
-		// 可能是纯 Base64 格式，尝试直接解码
-		decoded, err := base64.StdEncoding.DecodeString(privateKeyPEM)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode private key: not valid PEM or Base64 format")
-		}
-		keyBytes = decoded
-	}
-
-	// 尝试解析为 PKCS8 格式
-	privateKey, err := x509.ParsePKCS8PrivateKey(keyBytes)
-	if err != nil {
-		// 尝试解析为 PKCS1 格式
-		privateKey, err = x509.ParsePKCS1PrivateKey(keyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse private key: %w", err)
-		}
-	}
-
-	rsaKey, ok := privateKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, fmt.Errorf("not an RSA private key")
-	}
-
-	return rsaKey, nil
-}
-
 // verifyHaozPaySignature 验证皓臻支付回调签名
 // 验签算法流程:
 //  1. 构建签名字符串(按参数名ASCII升序排序)
@@ -210,51 +170,6 @@ func verifyHaozPaySignature(publicKeyPEM string, params map[string]string, signa
 	}
 
 	return nil
-}
-
-// encryptWithPrivateKey 使用私钥加密数据
-// 这是非标准 RSA 操作，用于兼容 Java Hutool 库的行为
-// Hutool 使用 Cipher.PRIVATE_KEY 模式，实际是: c = m^d mod n
-// 实现 PKCS#1 v1.5 填充 + 私钥模幂运算
-func encryptWithPrivateKey(privateKey *rsa.PrivateKey, data []byte) ([]byte, error) {
-	k := (privateKey.N.BitLen() + 7) / 8
-	if len(data) > k-11 {
-		return nil, fmt.Errorf("message too long for RSA key size")
-	}
-
-	// PKCS#1 v1.5 填充: 0x00 || 0x02 || PS || 0x00 || M
-	em := make([]byte, k)
-	em[0] = 0x00
-	em[1] = 0x02
-
-	// PS: 伪随机非零填充字节
-	ps := em[2 : k-len(data)-1]
-	for i := range ps {
-		for {
-			b := make([]byte, 1)
-			rand.Read(b)
-			if b[0] != 0 {
-				ps[i] = b[0]
-				break
-			}
-		}
-	}
-
-	em[k-len(data)-1] = 0x00
-	copy(em[k-len(data):], data)
-
-	// 将填充后的消息转换为大整数
-	m := new(big.Int).SetBytes(em)
-
-	// 使用私钥进行模幂运算: c = m^d mod n
-	c := new(big.Int).Exp(m, privateKey.D, privateKey.N)
-
-	// 转换为固定长度字节数组
-	out := make([]byte, k)
-	cBytes := c.Bytes()
-	copy(out[k-len(cBytes):], cBytes)
-
-	return out, nil
 }
 
 // decryptWithPublicKey 使用公钥解密数据
