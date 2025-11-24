@@ -1,6 +1,7 @@
 package haozpay
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -19,11 +20,11 @@ import (
 // 在每个请求发送前自动添加签名字段
 //
 // 皓臻支付签名算法:
-//   1. 收集请求参数(排除sign字段)
-//   2. 按参数名ASCII码升序排序
-//   3. 按"key=value"格式用&拼接成字符串
-//   4. 用SHA256算法生成摘要
-//   5. 用商户私钥对摘要进行RSA加密
+//  1. 收集请求参数(排除sign字段)
+//  2. 按参数名ASCII码升序排序
+//  3. 按"key=value"格式用&拼接成字符串
+//  4. 用SHA256算法生成摘要
+//  5. 用商户私钥对摘要进行RSA加密
 //
 // 参数:
 //   - privateKeyPEM: 商户私钥(PEM格式)
@@ -62,10 +63,10 @@ func signatureMiddleware(privateKeyPEM string) resty.RequestMiddleware {
 
 // generateHaozPaySignature 生成皓臻支付请求签名
 // 签名算法流程:
-//   1. 构建签名字符串(按参数名ASCII升序排序)
-//   2. 计算SHA256摘要
-//   3. 使用商户私钥对SHA256摘要进行RSA加密
-//   4. Base64编码
+//  1. 构建签名字符串(按参数名ASCII升序排序)
+//  2. 计算SHA256摘要
+//  3. 使用商户私钥对SHA256摘要进行RSA加密
+//  4. Base64编码
 //
 // 参数:
 //   - privateKeyPEM: 商户私钥(PEM格式)
@@ -114,8 +115,8 @@ func generateHaozPaySignature(privateKeyPEM string, params map[string]string) (s
 
 // parsePrivateKey 解析PEM格式的私钥
 // 支持两种格式:
-//   1. 完整的 PEM 格式(带 -----BEGIN/END----- 标志)
-//   2. 纯 Base64 编码的密钥字符串(不带标志)
+//  1. 完整的 PEM 格式(带 -----BEGIN/END----- 标志)
+//  2. 纯 Base64 编码的密钥字符串(不带标志)
 func parsePrivateKey(privateKeyPEM string) (*rsa.PrivateKey, error) {
 	var keyBytes []byte
 
@@ -153,10 +154,10 @@ func parsePrivateKey(privateKeyPEM string) (*rsa.PrivateKey, error) {
 
 // verifyHaozPaySignature 验证皓臻支付回调签名
 // 验签算法流程:
-//   1. 构建签名字符串(按参数名ASCII升序排序)
-//   2. 计算SHA256摘要
-//   3. 使用平台公钥解密签名
-//   4. 比较解密后的摘要与计算的摘要是否一致
+//  1. 构建签名字符串(按参数名ASCII升序排序)
+//  2. 计算SHA256摘要
+//  3. 使用平台公钥解密签名
+//  4. 比较解密后的摘要与计算的摘要是否一致
 //
 // 参数:
 //   - publicKeyPEM: 平台公钥(PEM格式)
@@ -212,28 +213,52 @@ func verifyHaozPaySignature(publicKeyPEM string, params map[string]string, signa
 }
 
 // encryptWithPrivateKey 使用私钥加密数据
-// 这是非标准的RSA用法，但与Java的Hutool库行为一致
-// Java的Hutool库实际上是用私钥做"签名"操作（textbook RSA）
+// 这是非标准 RSA 操作，用于兼容 Java Hutool 库的行为
+// Hutool 使用 Cipher.PRIVATE_KEY 模式，实际是: c = m^d mod n
+// 实现 PKCS#1 v1.5 填充 + 私钥模幂运算
 func encryptWithPrivateKey(privateKey *rsa.PrivateKey, data []byte) ([]byte, error) {
-	c := new(big.Int).SetBytes(data)
-	if c.Cmp(privateKey.N) >= 0 {
-		return nil, fmt.Errorf("message too long")
+	k := (privateKey.N.BitLen() + 7) / 8
+	if len(data) > k-11 {
+		return nil, fmt.Errorf("message too long for RSA key size")
 	}
 
-	// 使用私钥的 D 和 N 进行模幂运算: m = c^d mod n
-	m := new(big.Int).Exp(c, privateKey.D, privateKey.N)
+	// PKCS#1 v1.5 填充: 0x00 || 0x02 || PS || 0x00 || M
+	em := make([]byte, k)
+	em[0] = 0x00
+	em[1] = 0x02
 
-	// 补齐到密钥长度
-	keySize := (privateKey.N.BitLen() + 7) / 8
-	result := make([]byte, keySize)
-	mBytes := m.Bytes()
-	copy(result[keySize-len(mBytes):], mBytes)
+	// PS: 伪随机非零填充字节
+	ps := em[2 : k-len(data)-1]
+	for i := range ps {
+		for {
+			b := make([]byte, 1)
+			rand.Read(b)
+			if b[0] != 0 {
+				ps[i] = b[0]
+				break
+			}
+		}
+	}
 
-	return result, nil
+	em[k-len(data)-1] = 0x00
+	copy(em[k-len(data):], data)
+
+	// 将填充后的消息转换为大整数
+	m := new(big.Int).SetBytes(em)
+
+	// 使用私钥进行模幂运算: c = m^d mod n
+	c := new(big.Int).Exp(m, privateKey.D, privateKey.N)
+
+	// 转换为固定长度字节数组
+	out := make([]byte, k)
+	cBytes := c.Bytes()
+	copy(out[k-len(cBytes):], cBytes)
+
+	return out, nil
 }
 
 // decryptWithPublicKey 使用公钥解密数据
-// 这是非标准的RSA用法，但与Java的Hutool库行为一致  
+// 这是非标准的RSA用法，但与Java的Hutool库行为一致
 // Java的Hutool库实际上是用公钥做"验签"操作（textbook RSA）
 func decryptWithPublicKey(publicKey *rsa.PublicKey, data []byte) ([]byte, error) {
 	c := new(big.Int).SetBytes(data)
@@ -250,8 +275,8 @@ func decryptWithPublicKey(publicKey *rsa.PublicKey, data []byte) ([]byte, error)
 
 // parsePublicKey 解析PEM格式的公钥
 // 支持两种格式:
-//   1. 完整的 PEM 格式(带 -----BEGIN/END----- 标志)
-//   2. 纯 Base64 编码的密钥字符串(不带标志)
+//  1. 完整的 PEM 格式(带 -----BEGIN/END----- 标志)
+//  2. 纯 Base64 编码的密钥字符串(不带标志)
 func parsePublicKey(publicKeyPEM string) (*rsa.PublicKey, error) {
 	var keyBytes []byte
 
@@ -286,9 +311,9 @@ func parsePublicKey(publicKeyPEM string) (*rsa.PublicKey, error) {
 // 在接收到响应后检查 HTTP 状态码，如果是错误状态则解析错误信息
 //
 // 处理逻辑:
-//   1. 检查 HTTP 状态码是否 >= 400
-//   2. 如果是错误状态，尝试解析响应体中的错误信息
-//   3. 将错误信息包装为 SDKError 类型返回
+//  1. 检查 HTTP 状态码是否 >= 400
+//  2. 如果是错误状态，尝试解析响应体中的错误信息
+//  3. 将错误信息包装为 SDKError 类型返回
 //
 // 返回:
 //   - resty.ResponseMiddleware: resty 响应中间件函数
