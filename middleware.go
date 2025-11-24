@@ -1,8 +1,6 @@
 package haozpay
 
 import (
-	"crypto"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -10,6 +8,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"math/big"
 	"sort"
 	"strings"
 
@@ -62,7 +61,11 @@ func signatureMiddleware(privateKeyPEM string) resty.RequestMiddleware {
 }
 
 // generateHaozPaySignature 生成皓臻支付请求签名
-// 使用 SHA256WithRSA 算法对参数进行签名
+// 签名算法流程:
+//   1. 构建签名字符串(按参数名ASCII升序排序)
+//   2. 计算SHA256摘要
+//   3. 使用商户私钥对SHA256摘要进行RSA加密
+//   4. Base64编码
 //
 // 参数:
 //   - privateKeyPEM: 商户私钥(PEM格式)
@@ -94,18 +97,19 @@ func generateHaozPaySignature(privateKeyPEM string, params map[string]string) (s
 	paramsStr := sb.String()
 
 	hash := sha256.Sum256([]byte(paramsStr))
+	hashHex := fmt.Sprintf("%x", hash)
 
 	privateKey, err := parsePrivateKey(privateKeyPEM)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse private key: %w", err)
 	}
 
-	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hash[:])
+	encrypted, err := encryptWithPrivateKey(privateKey, []byte(hashHex))
 	if err != nil {
-		return "", fmt.Errorf("failed to sign: %w", err)
+		return "", fmt.Errorf("failed to encrypt with private key: %w", err)
 	}
 
-	return base64.StdEncoding.EncodeToString(signature), nil
+	return base64.StdEncoding.EncodeToString(encrypted), nil
 }
 
 // parsePrivateKey 解析PEM格式的私钥
@@ -132,7 +136,11 @@ func parsePrivateKey(privateKeyPEM string) (*rsa.PrivateKey, error) {
 }
 
 // verifyHaozPaySignature 验证皓臻支付回调签名
-// 使用平台公钥验证签名
+// 验签算法流程:
+//   1. 构建签名字符串(按参数名ASCII升序排序)
+//   2. 计算SHA256摘要
+//   3. 使用平台公钥解密签名
+//   4. 比较解密后的摘要与计算的摘要是否一致
 //
 // 参数:
 //   - publicKeyPEM: 平台公钥(PEM格式)
@@ -163,6 +171,7 @@ func verifyHaozPaySignature(publicKeyPEM string, params map[string]string, signa
 
 	paramsStr := sb.String()
 	hash := sha256.Sum256([]byte(paramsStr))
+	hashHex := fmt.Sprintf("%x", hash)
 
 	publicKey, err := parsePublicKey(publicKeyPEM)
 	if err != nil {
@@ -174,12 +183,53 @@ func verifyHaozPaySignature(publicKeyPEM string, params map[string]string, signa
 		return fmt.Errorf("failed to decode signature: %w", err)
 	}
 
-	err = rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, hash[:], sigBytes)
+	decrypted, err := decryptWithPublicKey(publicKey, sigBytes)
 	if err != nil {
-		return fmt.Errorf("signature verification failed: %w", err)
+		return fmt.Errorf("failed to decrypt with public key: %w", err)
+	}
+
+	if string(decrypted) != hashHex {
+		return fmt.Errorf("signature verification failed: hash mismatch")
 	}
 
 	return nil
+}
+
+// encryptWithPrivateKey 使用私钥加密数据
+// 这是非标准的RSA用法，但与Java的Hutool库行为一致
+// Java的Hutool库实际上是用私钥做"签名"操作（textbook RSA）
+func encryptWithPrivateKey(privateKey *rsa.PrivateKey, data []byte) ([]byte, error) {
+	c := new(big.Int).SetBytes(data)
+	if c.Cmp(privateKey.N) >= 0 {
+		return nil, fmt.Errorf("message too long")
+	}
+	
+	// 使用私钥的 D 和 N 进行模幂运算: m = c^d mod n
+	m := new(big.Int).Exp(c, privateKey.D, privateKey.N)
+	
+	// 补齐到密钥长度
+	keySize := (privateKey.N.BitLen() + 7) / 8
+	result := make([]byte, keySize)
+	mBytes := m.Bytes()
+	copy(result[keySize-len(mBytes):], mBytes)
+	
+	return result, nil
+}
+
+// decryptWithPublicKey 使用公钥解密数据
+// 这是非标准的RSA用法，但与Java的Hutool库行为一致  
+// Java的Hutool库实际上是用公钥做"验签"操作（textbook RSA）
+func decryptWithPublicKey(publicKey *rsa.PublicKey, data []byte) ([]byte, error) {
+	c := new(big.Int).SetBytes(data)
+	if c.Cmp(publicKey.N) >= 0 {
+		return nil, fmt.Errorf("message too long")
+	}
+	
+	// 使用公钥的 E 和 N 进行模幂运算: m = c^e mod n
+	m := new(big.Int).Exp(c, big.NewInt(int64(publicKey.E)), publicKey.N)
+	
+	// 去除前导零，返回原始数据
+	return m.Bytes(), nil
 }
 
 // parsePublicKey 解析PEM格式的公钥
