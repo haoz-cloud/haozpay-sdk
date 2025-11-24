@@ -60,58 +60,6 @@ func signatureMiddleware(privateKeyPEM string) resty.RequestMiddleware {
 	}
 }
 
-// generateHaozPaySignature 生成皓臻支付请求签名
-// 签名算法流程:
-//  1. 构建签名字符串(按参数名ASCII升序排序)
-//  2. 计算SHA256摘要
-//  3. 使用商户私钥对SHA256摘要进行RSA加密
-//  4. Base64编码
-//
-// 参数:
-//   - privateKeyPEM: 商户私钥(PEM格式)
-//   - params: 请求参数(不含sign字段)
-//
-// 返回:
-//   - string: Base64编码的签名字符串
-//   - error: 签名失败时返回错误
-func generateHaozPaySignature(privateKeyPEM string, params map[string]string) (string, error) {
-	keys := make([]string, 0, len(params))
-	for k := range params {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	var sb strings.Builder
-	for i, key := range keys {
-		value := params[key]
-		if value != "" {
-			if i > 0 {
-				sb.WriteString("&")
-			}
-			sb.WriteString(key)
-			sb.WriteString("=")
-			sb.WriteString(value)
-		}
-	}
-
-	paramsStr := sb.String()
-
-	hash := sha256.Sum256([]byte(paramsStr))
-	hashHex := fmt.Sprintf("%x", hash)
-
-	privateKey, err := parsePrivateKey(privateKeyPEM)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse private key: %w", err)
-	}
-
-	encrypted, err := encryptWithPrivateKey(privateKey, []byte(hashHex))
-	if err != nil {
-		return "", fmt.Errorf("failed to encrypt with private key: %w", err)
-	}
-
-	return base64.StdEncoding.EncodeToString(encrypted), nil
-}
-
 // verifyHaozPaySignature 验证皓臻支付回调签名
 // 验签算法流程:
 //  1. 构建签名字符串(按参数名ASCII升序排序)

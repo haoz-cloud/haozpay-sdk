@@ -1,6 +1,8 @@
 package haozpay
 
 import (
+	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -8,7 +10,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"math/big"
 	"sort"
 	"strings"
 )
@@ -65,6 +66,9 @@ func BuildSignString(params map[string]interface{}) string {
 // 3. 使用私钥对SHA256摘要进行RSA加密（兼容Java Hutool的encryptBase64）
 // 4. Base64编码
 //
+// 注意：使用SignPKCS1v15(crypto.Hash(0))实现私钥加密，等同于OpenSSL的RSA_private_encrypt
+// 这与Java Hutool的encryptBase64(data, KeyType.PrivateKey)行为一致
+//
 // params: 参数Map
 // privateKeyStr: 私钥字符串（支持纯私钥字符串或完整PEM格式）
 func GenerateSign(params map[string]interface{}, privateKeyStr string) (string, error) {
@@ -81,40 +85,16 @@ func GenerateSign(params map[string]interface{}, privateKeyStr string) (string, 
 		return "", fmt.Errorf("解析私钥失败: %w", err)
 	}
 
-	// 4. 使用私钥进行RSA加密（兼容Java Hutool的非标准加密方式）
-	// Java的Hutool库使用私钥加密时，实际是用私钥进行模运算
-	encryptedData, err := encryptWithPrivateKey(privateKey, []byte(sha256Hash))
+	// 4. 使用私钥进行RSA"加密"（实际上是签名操作，使用PKCS1v15填充）
+	// crypto.Hash(0) 表示不对数据进行预哈希，直接对原始数据签名
+	// 这等同于OpenSSL的RSA_private_encrypt和Java Hutool的encryptBase64(data, KeyType.PrivateKey)
+	encryptedData, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.Hash(0), []byte(sha256Hash))
 	if err != nil {
-		return "", fmt.Errorf("RSA私钥加密失败: %w", err)
+		return "", fmt.Errorf("RSA签名失败: %w", err)
 	}
 
 	// 5. Base64编码
 	return base64.StdEncoding.EncodeToString(encryptedData), nil
-}
-
-// encryptWithPrivateKey 使用私钥加密（模拟Java Hutool的encryptBase64行为）
-// 注意：这是非标准的RSA操作，仅用于兼容Java Hutool库
-func encryptWithPrivateKey(privateKey *rsa.PrivateKey, data []byte) ([]byte, error) {
-	// 将数据转换为大整数
-	m := new(big.Int).SetBytes(data)
-
-	// 检查数据是否超过模数
-	if m.Cmp(privateKey.N) >= 0 {
-		return nil, errors.New("数据过长，超过RSA模数")
-	}
-
-	// 使用私钥的指数进行模运算: c = m^d mod n
-	c := new(big.Int).Exp(m, privateKey.D, privateKey.N)
-
-	// 将结果转换为字节数组，填充到密钥长度
-	k := (privateKey.N.BitLen() + 7) / 8
-	encrypted := make([]byte, k)
-	cBytes := c.Bytes()
-
-	// 在前面补零，确保长度一致
-	copy(encrypted[k-len(cBytes):], cBytes)
-
-	return encrypted, nil
 }
 
 // parsePrivateKey 解析私钥（支持PKCS1和PKCS8格式，自动兼容纯私钥字符串和PEM格式）
