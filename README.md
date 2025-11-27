@@ -24,7 +24,7 @@
 ## 📦 安装
 
 ```bash
-go get codeup.aliyun.com/68c7e8dcccf3499544d820c6/pay/backend/pay-go-sdk
+go get github.com/haozcloud/haozpay-sdk
 ```
 
 ## 🚀 快速开始
@@ -38,7 +38,7 @@ import (
     "context"
     "log"
     
-    haozpay "codeup.aliyun.com/68c7e8dcccf3499544d820c6/pay/backend/pay-go-sdk"
+    haozpay "github.com/haozcloud/haozpay-sdk"
 )
 
 func main() {
@@ -221,6 +221,8 @@ if err != nil {
 
 - [皓臻支付官网](https://gate.haozpay.com)
 - [皓臻支付文档](https://gate.haozpay.com/docs)
+- [GitHub 仓库](https://github.com/haozcloud/haozpay-sdk)
+- [问题反馈](https://github.com/haozcloud/haozpay-sdk/issues)
 
 ## ⚠️ 注意事项
 
@@ -231,4 +233,4 @@ if err != nil {
 
 ## 📮 联系方式
 
-如有问题，请联系技术支持。
+如有问题，请提交 [Issue](https://github.com/haozcloud/haozpay-sdk/issues) 或联系技术支持。
