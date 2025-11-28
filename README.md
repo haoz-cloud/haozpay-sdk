@@ -120,8 +120,7 @@ log.Printf("退款申请成功，退款状态: %d", refund.RefundStatus)
 
 ```go
 queryReq := &haozpay.QueryRefundRequest{
-    OrderNo:     "ORDER123456",
-    RefundSeqId: "REFUND20251020001",
+    OrderNo: "ORDER123456",
 }
 
 refundStatus, err := client.Payment.QueryRefund(ctx, queryReq)

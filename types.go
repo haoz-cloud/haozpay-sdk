@@ -42,7 +42,7 @@ type CancelPaymentOrderRequest struct {
 }
 
 type CreateRefundRequest struct {
-	ReqSeqId     string  `json:"reqSeqId"`
+	OrderNo      string  `json:"orderNo"`
 	RefundAmount float64 `json:"refundAmount"`
 	RefundReason string  `json:"refundReason,omitempty"`
 	Remark       string  `json:"remark,omitempty"`
