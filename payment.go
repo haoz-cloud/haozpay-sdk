@@ -24,7 +24,11 @@ func NewPaymentService(client *resty.Client, config *Config) *PaymentService {
 func (s *PaymentService) CreateOrder(ctx context.Context, req *CreatePaymentOrderRequest) (*PaymentOrderResponse, error) {
 	bizBodyBytes, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal bizBody: %w", err)
+		return nil, &SDKError{
+			Code:       ErrInvalidResponse.Code,
+			Message:    fmt.Sprintf("failed to marshal request: %v", err),
+			StatusCode: 0,
+		}
 	}
 
 	haozReq := &HaozPayRequest{
@@ -45,14 +49,19 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req *CreatePaymentOrde
 		Post("/pay-core/payment/order")
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create payment order: %w", err)
+		return nil, &SDKError{
+			Code:       ErrNetworkError.Code,
+			Message:    fmt.Sprintf("failed to create payment order: %v", err),
+			StatusCode: 0,
+		}
 	}
 
 	if result.Code != 0 {
-		return nil, NewSDKError(
+		return nil, NewSDKErrorWithRequestID(
 			result.Code,
 			result.Message,
 			0,
+			result.RequestID,
 		)
 	}
 
@@ -62,7 +71,11 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req *CreatePaymentOrde
 func (s *PaymentService) CancelOrder(ctx context.Context, req *CancelPaymentOrderRequest) error {
 	bizBodyBytes, err := json.Marshal(req)
 	if err != nil {
-		return fmt.Errorf("failed to marshal bizBody: %w", err)
+		return &SDKError{
+			Code:       ErrInvalidResponse.Code,
+			Message:    fmt.Sprintf("failed to marshal request: %v", err),
+			StatusCode: 0,
+		}
 	}
 
 	haozReq := &HaozPayRequest{
@@ -80,14 +93,19 @@ func (s *PaymentService) CancelOrder(ctx context.Context, req *CancelPaymentOrde
 		Post("/pay-core/payment/cancel")
 
 	if err != nil {
-		return fmt.Errorf("failed to cancel payment order: %w", err)
+		return &SDKError{
+			Code:       ErrNetworkError.Code,
+			Message:    fmt.Sprintf("failed to cancel payment order: %v", err),
+			StatusCode: 0,
+		}
 	}
 
 	if result.Code != 0 {
-		return NewSDKError(
+		return NewSDKErrorWithRequestID(
 			result.Code,
 			result.Message,
 			0,
+			result.RequestID,
 		)
 	}
 
@@ -97,7 +115,11 @@ func (s *PaymentService) CancelOrder(ctx context.Context, req *CancelPaymentOrde
 func (s *PaymentService) CreateRefund(ctx context.Context, req *CreateRefundRequest) (*RefundResponse, error) {
 	bizBodyBytes, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal bizBody: %w", err)
+		return nil, &SDKError{
+			Code:       ErrInvalidResponse.Code,
+			Message:    fmt.Sprintf("failed to marshal request: %v", err),
+			StatusCode: 0,
+		}
 	}
 
 	haozReq := &HaozPayRequest{
@@ -118,14 +140,19 @@ func (s *PaymentService) CreateRefund(ctx context.Context, req *CreateRefundRequ
 		Post("/pay-core/payment/refund")
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create refund: %w", err)
+		return nil, &SDKError{
+			Code:       ErrNetworkError.Code,
+			Message:    fmt.Sprintf("failed to create refund: %v", err),
+			StatusCode: 0,
+		}
 	}
 
 	if result.Code != 0 {
-		return nil, NewSDKError(
+		return nil, NewSDKErrorWithRequestID(
 			result.Code,
 			result.Message,
 			0,
+			result.RequestID,
 		)
 	}
 
@@ -135,7 +162,11 @@ func (s *PaymentService) CreateRefund(ctx context.Context, req *CreateRefundRequ
 func (s *PaymentService) QueryRefund(ctx context.Context, req *QueryRefundRequest) (*QueryRefundResponse, error) {
 	bizBodyBytes, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal bizBody: %w", err)
+		return nil, &SDKError{
+			Code:       ErrInvalidResponse.Code,
+			Message:    fmt.Sprintf("failed to marshal request: %v", err),
+			StatusCode: 0,
+		}
 	}
 
 	haozReq := &HaozPayRequest{
@@ -156,14 +187,19 @@ func (s *PaymentService) QueryRefund(ctx context.Context, req *QueryRefundReques
 		Post("/pay-core/payment/refund/query")
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to query refund: %w", err)
+		return nil, &SDKError{
+			Code:       ErrNetworkError.Code,
+			Message:    fmt.Sprintf("failed to query refund: %v", err),
+			StatusCode: 0,
+		}
 	}
 
 	if result.Code != 0 {
-		return nil, NewSDKError(
+		return nil, NewSDKErrorWithRequestID(
 			result.Code,
 			result.Message,
 			0,
+			result.RequestID,
 		)
 	}
 

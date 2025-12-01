@@ -26,13 +26,13 @@
 ### 使用 go get 安装
 
 ```bash
-go get github.com/haozcloud/haozpay-sdk@v0.0.3
+go get github.com/haozcloud/haozpay-sdk@v1.0.0
 ```
 
 ### 或在 go.mod 中添加依赖
 
 ```go
-require github.com/haozcloud/haozpay-sdk v0.0.3
+require github.com/haozcloud/haozpay-sdk v1.0.0
 ```
 
 然后执行：
