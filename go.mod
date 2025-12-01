@@ -1,4 +1,4 @@
-module github.com/haozcloud/haozpay-sdk
+module github.com/haoz-cloud/haozpay-sdk
 
 go 1.23
 

@@ -26,13 +26,13 @@
 ### 使用 go get 安装
 
 ```bash
-go get github.com/haozcloud/haozpay-sdk@v1.0.0
+go get github.com/haoz-cloud/haozpay-sdk@v1.0.0
 ```
 
 ### 或在 go.mod 中添加依赖
 
 ```go
-require github.com/haozcloud/haozpay-sdk v1.0.0
+require github.com/haoz-cloud/haozpay-sdk v1.0.0
 ```
 
 然后执行：
@@ -52,7 +52,7 @@ import (
     "context"
     "log"
     
-    haozpay "github.com/haozcloud/haozpay-sdk"
+    haozpay "github.com/haoz-cloud/haozpay-sdk"
 )
 
 func main() {
@@ -220,8 +220,8 @@ if err != nil {
 ## 🔗 相关链接
 
 - [皓臻支付文档](https://gate.haozpay.com/docs)
-- [GitHub 仓库](https://github.com/haozcloud/haozpay-sdk)
-- [问题反馈](https://github.com/haozcloud/haozpay-sdk/issues)
+- [GitHub 仓库](https://github.com/haoz-cloud/haozpay-sdk)
+- [问题反馈](https://github.com/haoz-cloud/haozpay-sdk/issues)
 
 ## ⚠️ 注意事项
 
@@ -232,4 +232,4 @@ if err != nil {
 
 ## 📮 联系方式
 
-如有问题，请提交 [Issue](https://github.com/haozcloud/haozpay-sdk/issues) 或联系技术支持。
+如有问题，请提交 [Issue](https://github.com/haoz-cloud/haozpay-sdk/issues) 或联系技术支持。
