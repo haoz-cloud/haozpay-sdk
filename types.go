@@ -23,6 +23,7 @@ type CreatePaymentOrderRequest struct {
 	PayType           int     `json:"payType"`
 	UseHaozPayCashier bool    `json:"useHaozPayCashier"`
 	NotifyUrl         string  `json:"notifyUrl"`
+	RedirectUrl       string  `json:"redirectUrl,omitempty"`
 }
 
 type PaymentOrderResponse struct {
@@ -42,7 +43,8 @@ type CancelPaymentOrderRequest struct {
 }
 
 type CreateRefundRequest struct {
-	OrderNo      string  `json:"orderNo"`
+	OrderNo      string  `json:"orderNo,omitempty"`
+	ReqSeqId     string  `json:"reqSeqId,omitempty"`
 	RefundAmount float64 `json:"refundAmount"`
 	RefundReason string  `json:"refundReason,omitempty"`
 	Remark       string  `json:"remark,omitempty"`
@@ -69,7 +71,8 @@ type RefundResponse struct {
 }
 
 type QueryRefundRequest struct {
-	OrderNo string `json:"orderNo"`
+	OrderNo     string `json:"orderNo"`
+	RefundSeqId string `json:"refundSeqId,omitempty"`
 }
 
 type QueryRefundResponse struct {

@@ -113,6 +113,15 @@ func (s *PaymentService) CancelOrder(ctx context.Context, req *CancelPaymentOrde
 }
 
 func (s *PaymentService) CreateRefund(ctx context.Context, req *CreateRefundRequest) (*RefundResponse, error) {
+	// 业务校验: OrderNo 和 ReqSeqId 不能同时为空
+	if req.OrderNo == "" && req.ReqSeqId == "" {
+		return nil, &SDKError{
+			Code:       ErrInvalidRequest.Code,
+			Message:    "OrderNo and ReqSeqId cannot both be empty, at least one must be provided",
+			StatusCode: 0,
+		}
+	}
+
 	bizBodyBytes, err := json.Marshal(req)
 	if err != nil {
 		return nil, &SDKError{

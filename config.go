@@ -8,13 +8,15 @@ import (
 // Config SDK 客户端配置
 // 包含 API 连接、认证、超时、重试等所有配置项
 type Config struct {
-	// BaseURL API 服务的基础地址，例如: https://gate.haozpay.com
+	// BaseURL API 服务的基础地址，必填，例如: https://gate.haozpay.com
 	BaseURL string
-	// MerchantNo 商户编号，由皓臻支付平台分配
+	// MerchantNo 商户编号，由皓臻支付平台分配，必填
 	MerchantNo string
-	// PrivateKey 商户RSA私钥(PEM格式)，用于请求签名
+	// PrivateKey 商户RSA私钥(PEM格式)，必填，用于请求签名
 	// 需要妥善保管，不可泄露
 	PrivateKey string
+	// PlatFormPublicKey 平台RSA公钥匙（必填，用于回调验签）
+	PlatFormPublicKey string
 	// Timeout 单个请求的超时时间，默认 30 秒
 	Timeout time.Duration
 	// RetryCount 请求失败时的重试次数，默认 3 次
@@ -111,6 +113,31 @@ func (c *Config) WithMerchantNo(merchantNo string) *Config {
 //	config.WithPrivateKey(privateKeyPEM)
 func (c *Config) WithPrivateKey(privateKey string) *Config {
 	c.PrivateKey = privateKey
+	return c
+}
+
+// WithPlatFormPublicKey 设置平台RSA公钥
+// 支持链式调用
+//
+// 参数:
+//   - platFormPublicKey: 平台RSA公钥(PEM格式)，用于验证回调签名
+//
+// 返回:
+//   - *Config: 返回自身以支持链式调用
+//
+// 注意:
+//   - 公钥必须是PEM格式
+//   - 用于验证皓臻支付平台的回调通知签名
+//   - 公钥可从皓臻支付平台管理后台获取
+//
+// 示例:
+//
+//	platFormPublicKeyPEM := `-----BEGIN PUBLIC KEY-----
+//	MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
+//	-----END PUBLIC KEY-----`
+//	config.WithPlatFormPublicKey(platFormPublicKeyPEM)
+func (c *Config) WithPlatFormPublicKey(platFormPublicKey string) *Config {
+	c.PlatFormPublicKey = platFormPublicKey
 	return c
 }
 
@@ -212,12 +239,13 @@ func (c *Config) WithTLSConfig(tlsConfig *tls.Config) *Config {
 // 检查必填字段是否已设置
 //
 // 返回:
-//   - error: 如果配置无效则返回错误，否则返回 nil
+//   - error: 如果配置无效则返回错误,否则返回 nil
 //
 // 必填字段:
 //   - BaseURL: API 基础地址
 //   - MerchantNo: 商户编号
 //   - PrivateKey: 商户RSA私钥
+//   - PlatFormPublicKey: 平台RSA公钥
 func (c *Config) Validate() error {
 	if c.BaseURL == "" {
 		return ErrInvalidConfig("BaseURL is required")
@@ -227,6 +255,9 @@ func (c *Config) Validate() error {
 	}
 	if c.PrivateKey == "" {
 		return ErrInvalidConfig("PrivateKey is required")
+	}
+	if c.PlatFormPublicKey == "" {
+		return ErrInvalidConfig("PlatFormPublicKey is required")
 	}
 	return nil
 }
