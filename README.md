@@ -20,6 +20,7 @@
 | 订单取消 | `CancelOrder` | 取消未支付订单 |
 | 退款 | `CreateRefund` | 发起退款请求 |
 | 退款查询 | `QueryRefund` | 查询退款状态 |
+| 回调验证 | `VerifyCallback` | 验证支付/退款回调签名 |
 
 ## 📦 安装
 
@@ -143,9 +144,45 @@ if err != nil {
     log.Fatal(err)
 }
 
-log.Printf("退款状态: %s (代码: %d)", 
-    refundStatus.RefundStatusDesc, 
+log.Printf("退款状态: %s (代码: %d)",
+    refundStatus.RefundStatusDesc,
     refundStatus.RefundStatus)
+```
+
+### 6. 回调签名验证
+
+```go
+// 处理支付回调
+func handlePaymentCallback(w http.ResponseWriter, r *http.Request) {
+    // 从 HTTP 请求中获取所有回调参数（除了 sign）
+    params := map[string]string{
+        "merchantNo": r.FormValue("merchantNo"),
+        "orderNo":    r.FormValue("orderNo"),
+        "payStatus":  r.FormValue("payStatus"),
+        "payAmount":  r.FormValue("payAmount"),
+        "timestamp":  r.FormValue("timestamp"),
+        // ... 其他回调参数
+    }
+
+    // 获取签名
+    signature := r.FormValue("sign")
+
+    // 验证回调签名
+    if err := client.VerifyCallback(params, signature); err != nil {
+        log.Printf("回调签名验证失败: %v", err)
+        http.Error(w, "fail", http.StatusBadRequest)
+        return
+    }
+
+    // 签名验证通过，处理业务逻辑
+    log.Println("回调签名验证成功")
+
+    // 更新订单状态等业务逻辑
+    // ...
+
+    // 返回成功响应给皓臻支付平台
+    w.Write([]byte("success"))
+}
 ```
 
 ## 🔐 密钥配置

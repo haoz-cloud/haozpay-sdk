@@ -135,3 +135,43 @@ func (c *Client) GetConfig() *Config {
 func (c *Client) GetRestyClient() *resty.Client {
 	return c.restyClient
 }
+
+// VerifyCallback 验证皓臻支付平台回调签名
+// 用于在接收到支付/退款回调通知时验证签名的真实性
+//
+// 参数:
+//   - params: 回调参数（不包含 sign 字段），例如从 HTTP 请求中获取的所有参数
+//   - signature: 回调中的签名字符串（Base64 编码）
+//
+// 返回:
+//   - error: 验签失败时返回错误，成功返回 nil
+//
+// 使用场景:
+//   - 支付成功回调验签
+//   - 退款成功回调验签
+//   - 其他异步通知回调验签
+//
+// 示例:
+//
+//	// 从 HTTP 请求中获取回调参数
+//	params := map[string]string{
+//	    "merchantNo":      r.FormValue("merchantNo"),
+//	    "orderNo":         r.FormValue("orderNo"),
+//	    "payStatus":       r.FormValue("payStatus"),
+//	    "payAmount":       r.FormValue("payAmount"),
+//	    // ... 其他回调参数，不包括 sign
+//	}
+//	signature := r.FormValue("sign")
+//
+//	// 验证签名
+//	if err := client.VerifyCallback(params, signature); err != nil {
+//	    log.Printf("回调签名验证失败: %v", err)
+//	    http.Error(w, "signature verification failed", http.StatusBadRequest)
+//	    return
+//	}
+//
+//	// 签名验证通过，处理业务逻辑
+//	log.Println("回调签名验证成功")
+func (c *Client) VerifyCallback(params map[string]string, signature string) error {
+	return verifyHaozPaySignature(c.config.PlatFormPublicKey, params, signature)
+}
