@@ -93,15 +93,17 @@ func verifyHaozPaySignature(publicKeyPEM string, params map[string]string, signa
 	sort.Strings(keys)
 
 	var sb strings.Builder
-	for i, key := range keys {
+	first := true
+	for _, key := range keys {
 		value := params[key]
 		if value != "" {
-			if i > 0 {
+			if !first {
 				sb.WriteString("&")
 			}
 			sb.WriteString(key)
 			sb.WriteString("=")
 			sb.WriteString(value)
+			first = false
 		}
 	}
 
@@ -134,6 +136,8 @@ func verifyHaozPaySignature(publicKeyPEM string, params map[string]string, signa
 // decryptWithPublicKey 使用公钥解密数据
 // 这是非标准的RSA用法，但与Java的Hutool库行为一致
 // Java的Hutool库实际上是用公钥做"验签"操作（textbook RSA）
+//
+// 解密后需要去除 PKCS1v15 填充格式: 0x00 || 0x01 || PS(0xFF...) || 0x00 || M
 func decryptWithPublicKey(publicKey *rsa.PublicKey, data []byte) ([]byte, error) {
 	c := new(big.Int).SetBytes(data)
 	if c.Cmp(publicKey.N) >= 0 {
@@ -143,8 +147,44 @@ func decryptWithPublicKey(publicKey *rsa.PublicKey, data []byte) ([]byte, error)
 	// 使用公钥的 E 和 N 进行模幂运算: m = c^e mod n
 	m := new(big.Int).Exp(c, big.NewInt(int64(publicKey.E)), publicKey.N)
 
-	// 去除前导零，返回原始数据
-	return m.Bytes(), nil
+	// 将结果转为固定长度的字节数组（与密钥长度一致）
+	k := publicKey.Size()
+	em := make([]byte, k)
+	mBytes := m.Bytes()
+	copy(em[k-len(mBytes):], mBytes)
+
+	// 去除 PKCS1v15 填充: 0x00 || 0x01 || PS(0xFF...) || 0x00 || M
+	// 验证填充格式
+	if len(em) < 11 {
+		return nil, fmt.Errorf("decrypted message too short")
+	}
+	if em[0] != 0x00 || em[1] != 0x01 {
+		return nil, fmt.Errorf("invalid PKCS1v15 padding: bad header")
+	}
+
+	// 查找 PS 结束位置（0x00 分隔符）
+	separatorIdx := -1
+	for i := 2; i < len(em); i++ {
+		if em[i] == 0x00 {
+			separatorIdx = i
+			break
+		}
+		if em[i] != 0xFF {
+			return nil, fmt.Errorf("invalid PKCS1v15 padding: bad PS byte at position %d", i)
+		}
+	}
+
+	if separatorIdx == -1 {
+		return nil, fmt.Errorf("invalid PKCS1v15 padding: separator not found")
+	}
+
+	// PS 长度至少为 8 字节
+	if separatorIdx < 10 {
+		return nil, fmt.Errorf("invalid PKCS1v15 padding: PS too short")
+	}
+
+	// 返回原始数据 M
+	return em[separatorIdx+1:], nil
 }
 
 // parsePublicKey 解析PEM格式的公钥
